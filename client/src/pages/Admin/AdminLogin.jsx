@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
 import { toast } from 'react-toastify'
-import { FiLock, FiShield } from 'react-icons/fi'
+import { FiLock, FiShield, FiMail, FiArrowRight } from 'react-icons/fi'
 
 const AdminLogin = () => {
   const navigate = useNavigate()
@@ -43,40 +43,35 @@ const AdminLogin = () => {
   }
 
   return (
-    <div className="auth-container">
-      <div className="auth-card fade-in">
-        <div style={{ textAlign: 'center', marginBottom: '25px' }}>
-          <div style={{
-            width: '60px', height: '60px', margin: '0 auto 15px',
-            background: '#fdedec', borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.5rem', color: 'var(--danger-color)'
-          }}>
+    <div className="auth-page">
+      <div className="auth-box">
+        <div className="auth-header">
+          <div className="auth-icon-badge" style={{ background: '#fef2f2', color: '#dc2626', borderColor: '#fecaca' }}>
             <FiShield />
           </div>
           <h2>Admin Portal</h2>
-          <p className="subtitle">Sign in to the administration panel</p>
+          <p className="auth-subtitle">Restricted access for system administrators</p>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Admin Email</label>
+          <div className="input-with-icon">
+            <FiMail className="input-icon" />
             <input
               type="email"
               name="email"
-              placeholder="Enter admin email"
+              placeholder="Admin Email Address"
               value={formData.email}
               onChange={handleChange}
               required
             />
           </div>
 
-          <div className="form-group">
-            <label>Password</label>
+          <div className="input-with-icon">
+            <FiLock className="input-icon" />
             <input
               type="password"
               name="password"
-              placeholder="Enter admin password"
+              placeholder="Admin Password"
               value={formData.password}
               onChange={handleChange}
               required
@@ -85,17 +80,24 @@ const AdminLogin = () => {
 
           <button
             type="submit"
-            className="btn btn-danger"
+            className="auth-btn"
             disabled={loading}
-            style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
+            style={{ background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', boxShadow: '0 8px 20px -6px rgba(239, 68, 68, 0.4)' }}
           >
-            {loading ? 'Signing In...' : 'Admin Sign In'}
+            {loading ? 'Signing In...' : (
+              <>
+                Admin Sign In <FiArrowRight />
+              </>
+            )}
           </button>
         </form>
 
         <div className="auth-footer">
-          <p style={{ fontSize: '0.8rem', color: 'var(--gray)', marginTop: '10px' }}>
-            🔒 This area is restricted to authorized administrators only.
+          <p style={{ fontSize: '0.85rem' }}>
+            User account? <Link to="/login">User Sign In →</Link>
+          </p>
+          <p style={{ fontSize: '0.78rem', color: 'var(--gray)', marginTop: '8px' }}>
+            🔒 Authorized administrators only.
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { FiUser, FiMail, FiPhone, FiLock, FiArrowRight, FiMapPin } from "react-icons/fi";
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -56,69 +57,116 @@ function Register() {
 
   return (
     <div className="auth-page">
-      <div className="auth-box">
-        <h1>Create Account</h1>
+      <div className="auth-box" style={{ maxWidth: "480px" }}>
+        <div className="auth-header">
+          <div className="auth-icon-badge">
+            🌱
+          </div>
+          <h1>Create Account</h1>
+          <p className="auth-subtitle">Join the green movement to responsibly recycle e-waste</p>
+        </div>
 
         {error && (
-          <div style={{ color: "var(--danger-color, #e74c3c)", marginBottom: "15px", textAlign: "center" }}>
+          <div style={{
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#dc2626",
+            padding: "12px",
+            borderRadius: "10px",
+            fontSize: "0.88rem",
+            marginBottom: "20px",
+            textAlign: "center"
+          }}>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            name="name"
-            placeholder="Full Name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
+          <div className="input-with-icon">
+            <FiUser className="input-icon" />
+            <input
+              type="text"
+              name="name"
+              placeholder="Full Name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
+          <div className="input-with-icon">
+            <FiMail className="input-icon" />
+            <input
+              type="email"
+              name="email"
+              placeholder="Email Address"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-          <input
-            type="text"
-            name="phone"
-            placeholder="Phone Number"
-            value={formData.phone}
-            onChange={handleChange}
-          />
+          <div className="input-with-icon">
+            <FiPhone className="input-icon" />
+            <input
+              type="text"
+              name="phone"
+              placeholder="Phone Number (Optional)"
+              value={formData.phone}
+              onChange={handleChange}
+            />
+          </div>
 
-          <input
-            type="password"
-            name="password"
-            placeholder="Password (min 6 characters)"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            minLength={6}
-          />
+          <div className="input-with-icon">
+            <FiMapPin className="input-icon" />
+            <input
+              type="text"
+              name="address"
+              placeholder="Pickup Address (Optional)"
+              value={formData.address}
+              onChange={handleChange}
+            />
+          </div>
 
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-          />
+          <div className="input-with-icon">
+            <FiLock className="input-icon" />
+            <input
+              type="password"
+              name="password"
+              placeholder="Password (min 6 chars)"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              minLength={6}
+            />
+          </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Creating Account..." : "Register"}
+          <div className="input-with-icon">
+            <FiLock className="input-icon" />
+            <input
+              type="password"
+              name="confirmPassword"
+              placeholder="Confirm Password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <button type="submit" className="auth-btn" disabled={loading}>
+            {loading ? "Creating Account..." : (
+              <>
+                Create Account <FiArrowRight />
+              </>
+            )}
           </button>
         </form>
 
-        <p style={{ marginTop: "15px" }}>
-          Already have an account? <Link to="/login">Login</Link>
-        </p>
+        <div className="auth-footer">
+          <p>
+            Already have an account? <Link to="/login">Sign In</Link>
+          </p>
+        </div>
       </div>
     </div>
   );

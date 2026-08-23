@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { FiMail, FiLock, FiArrowRight } from "react-icons/fi";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -32,42 +33,95 @@ function Login() {
     }
   };
 
+  const handleDemoFill = (type) => {
+    if (type === 'user') {
+      setEmail("user@example.com");
+      setPassword("password123");
+    } else {
+      setEmail("admin@example.com");
+      setPassword("admin123");
+    }
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <h1>Login</h1>
+        <div className="auth-header">
+          <div className="auth-icon-badge">
+            ♻️
+          </div>
+          <h1>Welcome Back</h1>
+          <p className="auth-subtitle">
+            Sign in to schedule e-waste pickups & track eco rewards
+          </p>
+        </div>
 
         {error && (
-          <div style={{ color: "var(--danger-color, #e74c3c)", marginBottom: "15px", textAlign: "center" }}>
+          <div style={{
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#dc2626",
+            padding: "12px",
+            borderRadius: "10px",
+            fontSize: "0.88rem",
+            marginBottom: "20px",
+            textAlign: "center"
+          }}>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          <div className="input-with-icon">
+            <FiMail className="input-icon" />
+            <input
+              type="email"
+              placeholder="Email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="input-with-icon">
+            <FiLock className="input-icon" />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          <button type="submit" className="auth-btn" disabled={loading}>
+            {loading ? "Logging in..." : (
+              <>
+                Sign In <FiArrowRight />
+              </>
+            )}
           </button>
         </form>
 
-        <p style={{ marginTop: "15px" }}>
-          Don't have an account? <Link to="/register">Register</Link>
-        </p>
+        <div className="demo-credentials-box">
+          <div>
+            <p style={{ fontWeight: 600, color: "#334155" }}>⚡ Auto Fill Demo</p>
+            <p>Click for instant testing</p>
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button type="button" className="demo-fill-btn" onClick={() => handleDemoFill('user')}>User</button>
+            <button type="button" className="demo-fill-btn" onClick={() => handleDemoFill('admin')}>Admin</button>
+          </div>
+        </div>
+
+        <div className="auth-footer">
+          <p>
+            Don't have an account? <Link to="/register">Register Now</Link>
+          </p>
+          <p style={{ marginTop: "10px", fontSize: "0.82rem" }}>
+            Are you an admin? <Link to="/admin/login" style={{ color: "#ef4444" }}>Admin Sign In →</Link>
+          </p>
+        </div>
       </div>
     </div>
   );
