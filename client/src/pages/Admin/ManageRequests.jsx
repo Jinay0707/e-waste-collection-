@@ -3,7 +3,7 @@ import Sidebar from '../../components/Sidebar'
 import Card from '../../components/Card'
 import api from '../../services/api'
 import { toast } from 'react-toastify'
-import { FiSearch, FiEye, FiCheckCircle, FiXCircle, FiTruck, FiCheck } from 'react-icons/fi'
+import { FiSearch, FiEye, FiCheckCircle, FiXCircle, FiTruck, FiCheck, FiRefreshCw } from 'react-icons/fi'
 
 const ManageRequests = () => {
   const [requests, setRequests] = useState([])
@@ -18,15 +18,46 @@ const ManageRequests = () => {
   }, [])
 
   const fetchRequests = async () => {
+    setLoading(true)
     try {
-      const { data } = await api.get('/api/admin/requests')
-      if (Array.isArray(data)) {
-        setRequests(data)
-      } else if (data && Array.isArray(data.data)) {
-        setRequests(data.data)
+      // 1. Fetch from server
+      let serverList = []
+      try {
+        const { data } = await api.get('/api/collections/admin/all')
+        serverList = Array.isArray(data) ? data : (data?.data || [])
+      } catch (err) {
+        console.log('Server fetch fallback, trying /api/admin/requests')
+        try {
+          const { data } = await api.get('/api/admin/requests')
+          serverList = Array.isArray(data) ? data : (data?.data || [])
+        } catch (e) {}
       }
+
+      // 2. Read local stored items submitted in browser
+      let localList = []
+      try {
+        localList = JSON.parse(localStorage.getItem('user_collections') || '[]')
+      } catch (e) {}
+
+      // 3. Merge server and local requests (prevent duplicate IDs)
+      const mergedMap = new Map()
+
+      // Add server items first
+      serverList.forEach(item => {
+        if (item && item._id) mergedMap.set(String(item._id), item)
+      })
+
+      // Add local items
+      localList.forEach(item => {
+        if (item && item._id && !mergedMap.has(String(item._id))) {
+          mergedMap.set(String(item._id), item)
+        }
+      })
+
+      const combined = Array.from(mergedMap.values())
+      setRequests(combined)
     } catch (error) {
-      console.error('Error fetching requests from server:', error)
+      console.error('Error fetching requests:', error)
     } finally {
       setLoading(false)
     }
@@ -34,17 +65,32 @@ const ManageRequests = () => {
 
   const updateStatus = async (id, newStatus) => {
     try {
-      await api.put(`/api/admin/requests/${id}`, { status: newStatus })
-      setRequests(requests.map(r => r._id === id ? { ...r, status: newStatus } : r))
-      toast.success(`Request marked as ${newStatus}!`)
-      if (selectedRequest && selectedRequest._id === id) {
+      // Send to server
+      try {
+        await api.put(`/api/collections/admin/${id}/status`, { status: newStatus })
+      } catch (e) {
+        await api.put(`/api/admin/requests/${id}`, { status: newStatus })
+      }
+
+      // Update in state
+      setRequests(prev => prev.map(r => String(r._id) === String(id) ? { ...r, status: newStatus } : r))
+
+      // Update in localStorage
+      try {
+        const localList = JSON.parse(localStorage.getItem('user_collections') || '[]')
+        const updated = localList.map(r => String(r._id) === String(id) ? { ...r, status: newStatus } : r)
+        localStorage.setItem('user_collections', JSON.stringify(updated))
+      } catch (e) {}
+
+      toast.success(`Request status updated to ${newStatus}!`)
+      if (selectedRequest && String(selectedRequest._id) === String(id)) {
         setSelectedRequest({ ...selectedRequest, status: newStatus })
       }
       setShowModal(false)
     } catch (error) {
-      // Local fallback state update
-      setRequests(requests.map(r => r._id === id ? { ...r, status: newStatus } : r))
-      toast.success(`Request marked as ${newStatus}`)
+      // Local fallback
+      setRequests(prev => prev.map(r => String(r._id) === String(id) ? { ...r, status: newStatus } : r))
+      toast.success(`Request status marked as ${newStatus}`)
       setShowModal(false)
     }
   }
@@ -64,12 +110,13 @@ const ManageRequests = () => {
   }
 
   const filteredRequests = requests.filter((req) => {
-    const matchesSearch =
-      (req.userName && req.userName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (req.deviceType && req.deviceType.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (req.city && req.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (req.userPhone && req.userPhone.includes(searchTerm))
+    const name = (req.userName || req.name || '').toLowerCase()
+    const dev = (req.deviceType || req.eWasteType || '').toLowerCase()
+    const city = (req.city || '').toLowerCase()
+    const phone = (req.userPhone || req.phone || '')
+    const term = searchTerm.toLowerCase()
 
+    const matchesSearch = name.includes(term) || dev.includes(term) || city.includes(term) || phone.includes(term)
     const matchesStatus =
       filterStatus === 'all' || (req.status && req.status.toLowerCase() === filterStatus.toLowerCase())
 
@@ -80,9 +127,19 @@ const ManageRequests = () => {
     <div className="dashboard-container">
       <Sidebar isAdmin={true} />
       <div className="dashboard-main">
-        <div className="page-header">
-          <h1>Manage Pickup Requests</h1>
-          <p>Review, accept, schedule and manage e-waste collection requests</p>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1>Manage Pickup Requests</h1>
+            <p>Review, accept, approve and schedule customer e-waste collection requests</p>
+          </div>
+          <button
+            className="btn btn-outline"
+            onClick={fetchRequests}
+            title="Refresh Requests"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <FiRefreshCw /> Refresh
+          </button>
         </div>
 
         {/* Filters */}
@@ -90,7 +147,7 @@ const ManageRequests = () => {
           <div style={{ flex: '1', minWidth: '220px', position: 'relative' }}>
             <input
               type="text"
-              placeholder="Search by user, device, phone, or city..."
+              placeholder="Search by customer name, device, phone, or city..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ paddingLeft: '35px' }}
@@ -103,8 +160,8 @@ const ManageRequests = () => {
             style={{ width: '180px' }}
           >
             <option value="all">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Accepted">Accepted</option>
+            <option value="Pending">Pending Approval</option>
+            <option value="Accepted">Approved / Accepted</option>
             <option value="Scheduled">Scheduled</option>
             <option value="Completed">Completed</option>
             <option value="Cancelled">Cancelled</option>
@@ -112,14 +169,14 @@ const ManageRequests = () => {
         </div>
 
         {/* Requests Table */}
-        <Card title={`All Requests (${filteredRequests.length})`}>
+        <Card title={`All Pickup Requests (${filteredRequests.length})`}>
           {loading ? (
             <p style={{ textAlign: 'center', padding: '30px' }}>Loading requests...</p>
           ) : filteredRequests.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--gray)' }}>
               <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>No requests found</p>
               <p style={{ fontSize: '0.9rem', marginTop: '4px' }}>
-                When users schedule a pickup, their requests will appear here in real-time.
+                When users schedule a pickup, their requests will appear here immediately.
               </p>
             </div>
           ) : (
@@ -127,13 +184,13 @@ const ManageRequests = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>User & Phone</th>
+                    <th>Customer</th>
                     <th>Device</th>
                     <th>Qty / Weight</th>
                     <th>City / Address</th>
                     <th>Pickup Date</th>
                     <th>Status</th>
-                    <th>Quick Actions</th>
+                    <th>Approval Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -141,40 +198,42 @@ const ManageRequests = () => {
                     <tr key={req._id}>
                       <td>
                         <div>
-                          <strong style={{ fontSize: '0.9rem' }}>{req.userName || 'Customer'}</strong>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>{req.userPhone || req.userEmail || '-'}</p>
+                          <strong style={{ fontSize: '0.9rem' }}>{req.userName || req.name || 'Customer'}</strong>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--gray)', margin: 0 }}>
+                            {req.userPhone || req.phone || req.userEmail || '-'}
+                          </p>
                         </div>
                       </td>
                       <td>
-                        <strong>{req.deviceType}</strong>
-                        {req.brand && <p style={{ fontSize: '0.75rem', color: 'var(--gray)' }}>{req.brand} {req.model}</p>}
+                        <strong>{req.deviceType || req.eWasteType}</strong>
+                        {req.brand && <p style={{ fontSize: '0.75rem', color: 'var(--gray)', margin: 0 }}>{req.brand} {req.model}</p>}
                       </td>
-                      <td>{req.quantity} ({req.weight})</td>
+                      <td>{req.quantity} ({req.weight || '1 kg'})</td>
                       <td style={{ maxWidth: '200px', fontSize: '0.85rem' }}>
-                        <span>{req.city || ''} {req.address}</span>
+                        <span>{req.city ? `${req.city}, ` : ''}{req.address}</span>
                       </td>
                       <td>{req.pickupDate || req.date || '-'}</td>
                       <td>
                         <span className={`badge ${getStatusBadge(req.status)}`}>
-                          {req.status}
+                          {req.status === 'Pending' ? '⏳ Pending Approval' : req.status}
                         </span>
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          {/* Direct Accept Button */}
+                          {/* Direct Approve / Accept Button */}
                           {req.status === 'Pending' && (
                             <button
                               className="btn btn-success"
                               style={{ padding: '6px 12px', fontSize: '0.78rem' }}
-                              title="Accept Request"
+                              title="Approve / Accept Request"
                               onClick={() => updateStatus(req._id, 'Accepted')}
                             >
-                              <FiCheck /> Accept
+                              <FiCheck /> Approve
                             </button>
                           )}
 
                           {/* Quick Schedule Button */}
-                          {req.status === 'Accepted' && (
+                          {(req.status === 'Accepted' || req.status === 'Approved') && (
                             <button
                               className="btn btn-primary"
                               style={{ padding: '6px 10px', fontSize: '0.78rem' }}
@@ -225,12 +284,12 @@ const ManageRequests = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div><strong>Customer Name:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.userName || '-'}</span></div>
-                <div><strong>Phone Number:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.userPhone || '-'}</span></div>
+                <div><strong>Customer Name:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.userName || selectedRequest.name || '-'}</span></div>
+                <div><strong>Phone Number:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.userPhone || selectedRequest.phone || '-'}</span></div>
                 <div><strong>Email:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.userEmail || '-'}</span></div>
-                <div><strong>Device:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.deviceType} {selectedRequest.brand && `(${selectedRequest.brand})`}</span></div>
+                <div><strong>Device:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.deviceType || selectedRequest.eWasteType} {selectedRequest.brand && `(${selectedRequest.brand})`}</span></div>
                 <div><strong>Quantity:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.quantity}</span></div>
-                <div><strong>Estimated Weight:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.weight}</span></div>
+                <div><strong>Estimated Weight:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.weight || '1 kg'}</span></div>
                 <div><strong>Condition:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.condition || 'Used'}</span></div>
                 <div><strong>City:</strong><br /><span style={{ fontSize: '0.9rem' }}>{selectedRequest.city || '-'}</span></div>
                 <div style={{ gridColumn: 'span 2' }}>
@@ -248,21 +307,21 @@ const ManageRequests = () => {
               </div>
 
               <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                <p style={{ marginBottom: '10px', fontWeight: 600 }}>Update Status:</p>
+                <p style={{ marginBottom: '10px', fontWeight: 600 }}>Approval & Status Action:</p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     className="btn btn-success"
                     style={{ padding: '8px 14px', fontSize: '0.85rem' }}
                     onClick={() => updateStatus(selectedRequest._id, 'Accepted')}
                   >
-                    <FiCheck /> Accept Request
+                    <FiCheck /> Approve Request
                   </button>
                   <button
                     className="btn btn-primary"
                     style={{ padding: '8px 14px', fontSize: '0.85rem' }}
                     onClick={() => updateStatus(selectedRequest._id, 'Scheduled')}
                   >
-                    <FiTruck /> Schedule Pickup
+                    <FiTruck /> Schedule Collector
                   </button>
                   <button
                     className="btn btn-success"

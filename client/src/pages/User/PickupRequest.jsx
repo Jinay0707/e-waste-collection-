@@ -11,7 +11,10 @@ const PickupRequest = () => {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
     deviceType: 'Laptop',
+    eWasteType: 'Laptop',
     brand: '',
     model: '',
     quantity: 1,
@@ -21,7 +24,6 @@ const PickupRequest = () => {
     pickupTime: '',
     address: user?.address || '',
     city: user?.city || '',
-    phone: user?.phone || '',
     specialInstructions: ''
   })
 
@@ -53,11 +55,11 @@ const PickupRequest = () => {
   const handleCategorySelect = (categoryName) => {
     setFormData({
       ...formData,
-      deviceType: categoryName
+      deviceType: categoryName,
+      eWasteType: categoryName
     })
   }
 
-  // Calculate live estimated reward points
   const calculateEstimatedPoints = () => {
     const matchedCategory = quickCategories.find(c => c.name === formData.deviceType)
     const basePts = matchedCategory ? matchedCategory.basePoints : 25
@@ -65,8 +67,7 @@ const PickupRequest = () => {
     const weight = parseFloat(formData.weight) || 1
     const conditionMultiplier = formData.condition === 'working' ? 1.2 : formData.condition === 'partially-working' ? 1.0 : 0.8
 
-    const totalPts = Math.round((basePts * qty + (weight * 5)) * conditionMultiplier)
-    return totalPts
+    return Math.round((basePts * qty + (weight * 5)) * conditionMultiplier)
   }
 
   const estimatedPoints = calculateEstimatedPoints()
@@ -80,17 +81,44 @@ const PickupRequest = () => {
     }
 
     setLoading(true)
+    const payload = {
+      ...formData,
+      eWasteType: formData.deviceType,
+      name: formData.name || user?.name || 'Customer',
+      phone: formData.phone || user?.phone || '',
+      address: formData.address || user?.address || '',
+      estimatedPoints,
+      userId: user?._id
+    }
+
     try {
-      await api.post('/api/pickup', {
-        ...formData,
-        estimatedPoints,
-        userId: user?._id
-      })
-      toast.success(`Pickup request submitted! You will earn ~${estimatedPoints} Green Points on completion.`)
+      // Send to server
+      const res = await api.post('/api/collections', payload)
+      const savedItem = res.data?.data || payload
+
+      // Store in local storage so client fallback always has this request
+      try {
+        const localItems = JSON.parse(localStorage.getItem('user_collections') || '[]')
+        localItems.unshift({ ...savedItem, _id: savedItem._id || ('REQ-' + Date.now()) })
+        localStorage.setItem('user_collections', JSON.stringify(localItems))
+      } catch (e) {}
+
+      toast.success(`Pickup request submitted! Awaiting Admin Approval.`)
       navigate('/my-requests')
     } catch (error) {
-      // Demo fallback success if backend offline
-      toast.success(`Pickup request scheduled! Estimated Reward: ${estimatedPoints} Points.`)
+      // Local fallback if server network issues
+      try {
+        const localItems = JSON.parse(localStorage.getItem('user_collections') || '[]')
+        localItems.unshift({
+          ...payload,
+          _id: 'REQ-' + Date.now(),
+          status: 'Pending',
+          createdAt: new Date().toISOString()
+        })
+        localStorage.setItem('user_collections', JSON.stringify(localItems))
+      } catch (e) {}
+
+      toast.success(`Pickup request scheduled! Awaiting Admin Approval.`)
       navigate('/my-requests')
     } finally {
       setLoading(false)
@@ -106,44 +134,12 @@ const PickupRequest = () => {
           <p>Fill in the details below to schedule your e-waste collection and earn rewards</p>
         </div>
 
-        {/* Form Step Progress Bar */}
-        <div className="form-step-bar">
-          <div className="step-item active">
-            <span className="step-num">1</span>
-            <span>Device Selection</span>
-          </div>
-          <div className="step-item active">
-            <span className="step-num">2</span>
-            <span>Date & Time Slot</span>
-          </div>
-          <div className="step-item active">
-            <span className="step-num">3</span>
-            <span>Location & Submit</span>
-          </div>
-        </div>
-
-        {/* Instant Points Estimator Card */}
-        <div className="estimator-card">
-          <div className="estimator-info">
-            <h4><FiAward style={{ fontSize: '1.4rem' }} /> Live Eco Points Estimator</h4>
-            <p>You will earn points based on your selected device, weight, and working condition.</p>
-          </div>
-          <div className="points-badge-large">
-            <span>⭐ +{estimatedPoints}</span>
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, opacity: 0.9 }}>Points</span>
-          </div>
-        </div>
-
-        <div className="card glass-card">
-          <div className="card-header">
-            <h3><FiTruck /> Pickup Request Form</h3>
-          </div>
-
+        <div className="card">
           <form onSubmit={handleSubmit}>
-            {/* Quick Category Tile Selection */}
-            <h4 style={{ marginBottom: '12px', color: 'var(--secondary-color)' }}>
-              Select Category
-            </h4>
+            {/* Category Grid */}
+            <h3 style={{ marginBottom: '14px', fontSize: '1rem', color: 'var(--secondary-color)' }}>
+              1. Select E-Waste Category
+            </h3>
             <div className="category-tiles-grid">
               {quickCategories.map((cat) => (
                 <div
@@ -153,18 +149,29 @@ const PickupRequest = () => {
                 >
                   <span className="tile-icon">{cat.icon}</span>
                   <span className="tile-name">{cat.name}</span>
-                  <span className="tile-pts">+{cat.basePoints} pts</span>
+                  <span className="tile-pts">+{cat.basePoints} Pts</span>
                 </div>
               ))}
             </div>
 
-            {/* Device Information */}
-            <h4 style={{ marginBottom: '15px', color: 'var(--secondary-color)', marginTop: '20px' }}>
-              <FiPackage /> Device Details
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+            {/* Estimated Points Card */}
+            <div className="estimator-card">
+              <div className="estimator-info">
+                <h4>🎉 Estimated Green Reward</h4>
+                <p>Earn points when our team collects and recycles this e-waste.</p>
+              </div>
+              <div className="points-badge-large">
+                +{estimatedPoints} Pts
+              </div>
+            </div>
+
+            {/* Device Details */}
+            <h3 style={{ margin: '24px 0 14px', fontSize: '1rem', color: 'var(--secondary-color)' }}>
+              2. Device & Item Details
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
               <div className="form-group">
-                <label>Device Type *</label>
+                <label>Specific Device Type *</label>
                 <select name="deviceType" value={formData.deviceType} onChange={handleChange} required>
                   {deviceTypes.map((type) => (
                     <option key={type} value={type}>{type}</option>
@@ -173,22 +180,22 @@ const PickupRequest = () => {
               </div>
 
               <div className="form-group">
-                <label>Brand</label>
+                <label>Brand / Manufacturer</label>
                 <input
                   type="text"
                   name="brand"
-                  placeholder="e.g., Dell, Apple, Samsung"
+                  placeholder="e.g. Dell, Samsung, Apple, HP"
                   value={formData.brand}
                   onChange={handleChange}
                 />
               </div>
 
               <div className="form-group">
-                <label>Model</label>
+                <label>Model Name (Optional)</label>
                 <input
                   type="text"
                   name="model"
-                  placeholder="e.g., XPS 15, iPhone 13"
+                  placeholder="e.g. Inspiron 15, Galaxy S21"
                   value={formData.model}
                   onChange={handleChange}
                 />
@@ -200,75 +207,59 @@ const PickupRequest = () => {
                   type="number"
                   name="quantity"
                   min="1"
-                  max="50"
+                  max="100"
                   value={formData.quantity}
                   onChange={handleChange}
+                  required
                 />
               </div>
 
               <div className="form-group">
-                <label>Estimated Weight (kg)</label>
+                <label>Estimated Weight (in kg)</label>
                 <input
                   type="number"
                   name="weight"
-                  placeholder="e.g., 2.5"
+                  min="0.1"
+                  step="0.1"
                   value={formData.weight}
                   onChange={handleChange}
-                  step="0.5"
+                  required
                 />
               </div>
 
               <div className="form-group">
                 <label>Condition</label>
                 <select name="condition" value={formData.condition} onChange={handleChange}>
-                  <option value="working">Working (+20% bonus points)</option>
-                  <option value="partially-working">Partially Working</option>
-                  <option value="not-working">Not Working / Scrap</option>
-                  <option value="damaged">Damaged / Broken</option>
+                  <option value="working">Working Condition (+20% bonus points)</option>
+                  <option value="partially-working">Partially Working / Minor Damage</option>
+                  <option value="not-working">Dead / Non-working / Scrapped</option>
                 </select>
               </div>
             </div>
 
-            {/* Pickup Details */}
-            <h4 style={{ marginBottom: '15px', color: 'var(--secondary-color)' }}>
-              <FiCalendar /> Schedule Date & Time
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+            {/* Contact & Address */}
+            <h3 style={{ margin: '24px 0 14px', fontSize: '1rem', color: 'var(--secondary-color)' }}>
+              3. Contact & Pickup Location
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
               <div className="form-group">
-                <label>Pickup Date *</label>
+                <label>Your Name *</label>
                 <input
-                  type="date"
-                  name="pickupDate"
-                  value={formData.pickupDate}
+                  type="text"
+                  name="name"
+                  placeholder="Full Name"
+                  value={formData.name}
                   onChange={handleChange}
-                  min={new Date().toISOString().split('T')[0]}
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label>Pickup Time Slot *</label>
-                <select name="pickupTime" value={formData.pickupTime} onChange={handleChange} required>
-                  <option value="">Select time slot</option>
-                  <option value="09:00 AM - 11:00 AM">09:00 AM - 11:00 AM (Morning)</option>
-                  <option value="11:00 AM - 01:00 PM">11:00 AM - 01:00 PM (Noon)</option>
-                  <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM (Afternoon)</option>
-                  <option value="04:00 PM - 06:00 PM">04:00 PM - 06:00 PM (Evening)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Location Details */}
-            <h4 style={{ marginBottom: '15px', color: 'var(--secondary-color)' }}>
-              <FiMapPin /> Pickup Location & Address
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-              <div className="form-group">
-                <label>Contact Phone Number *</label>
+                <label>Phone Number *</label>
                 <input
-                  type="tel"
+                  type="text"
                   name="phone"
-                  placeholder="e.g., +91 9876543210"
+                  placeholder="Mobile Number"
                   value={formData.phone}
                   onChange={handleChange}
                   required
@@ -280,7 +271,7 @@ const PickupRequest = () => {
                 <input
                   type="text"
                   name="city"
-                  placeholder="e.g., Ahmedabad, Vadodara, Surat"
+                  placeholder="e.g. Ahmedabad, Surat, Mumbai"
                   value={formData.city}
                   onChange={handleChange}
                   required
@@ -288,38 +279,75 @@ const PickupRequest = () => {
               </div>
 
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label>Full Address *</label>
+                <label>Full Pickup Address *</label>
                 <textarea
                   name="address"
-                  placeholder="Flat/House No., Building Name, Street, Landmark..."
+                  rows="2"
+                  placeholder="Flat/House No, Building, Street, Landmark, Pincode"
                   value={formData.address}
                   onChange={handleChange}
-                  style={{ minHeight: '80px' }}
                   required
                 />
               </div>
             </div>
 
-            {/* Special Instructions */}
-            <div className="form-group" style={{ marginBottom: '25px' }}>
-              <label>Special Instructions (Optional)</label>
-              <textarea
-                name="specialInstructions"
-                placeholder="Gate code, landmark notes, or preferred contact method..."
-                value={formData.specialInstructions}
-                onChange={handleChange}
-                style={{ minHeight: '70px' }}
-              />
+            {/* Schedule Slot */}
+            <h3 style={{ margin: '24px 0 14px', fontSize: '1rem', color: 'var(--secondary-color)' }}>
+              4. Preferred Pickup Slot
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              <div className="form-group">
+                <label>Pickup Date *</label>
+                <input
+                  type="date"
+                  name="pickupDate"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={formData.pickupDate}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Time Slot *</label>
+                <select name="pickupTime" value={formData.pickupTime} onChange={handleChange} required>
+                  <option value="">Select a preferred time</option>
+                  <option value="09:00 AM - 12:00 PM">Morning (09:00 AM - 12:00 PM)</option>
+                  <option value="12:00 PM - 03:00 PM">Afternoon (12:00 PM - 03:00 PM)</option>
+                  <option value="03:00 PM - 06:00 PM">Evening (03:00 PM - 06:00 PM)</option>
+                  <option value="06:00 PM - 08:00 PM">Late Evening (06:00 PM - 08:00 PM)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label>Special Instructions (Optional)</label>
+                <input
+                  type="text"
+                  name="specialInstructions"
+                  placeholder="e.g. Ring doorbell, item is packed in carton box"
+                  value={formData.specialInstructions}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-              style={{ padding: '14px 40px', fontSize: '1rem', width: '100%', borderRadius: '30px' }}
-            >
-              {loading ? 'Submitting Request...' : `Confirm Pickup & Earn ~${estimatedPoints} Points`}
-            </button>
+            <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => navigate('/dashboard')}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+                style={{ padding: '12px 28px' }}
+              >
+                {loading ? 'Submitting Request...' : 'Schedule Pickup Now'}
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -328,4 +356,3 @@ const PickupRequest = () => {
 }
 
 export default PickupRequest
-
