@@ -2,6 +2,7 @@ const express = require("express");
 const {
   registerUser,
   loginUser,
+  adminLoginUser,
   getUserProfile,
   updateUserProfile,
 } = require("../controllers/authController");
@@ -12,6 +13,7 @@ const router = express.Router();
 // Public routes
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.post("/admin/login", adminLoginUser);
 
 // Protected routes
 router.get("/profile", protect, getUserProfile);

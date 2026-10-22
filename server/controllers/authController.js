@@ -180,9 +180,90 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
+// @desc    Admin login
+// @route   POST /api/auth/admin/login
+// @access  Public
+const adminLoginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check for hardcoded default admin credentials
+    if (
+      (email === "admin@example.com" && password === "admin123") ||
+      (email === "admin@ewaste.com" && password === "admin123")
+    ) {
+      // Find or create admin in DB
+      let adminUser = await User.findOne({ email });
+      if (!adminUser) {
+        adminUser = await User.create({
+          name: "System Administrator",
+          email,
+          password: "admin123",
+          role: "admin",
+          phone: "9999999999",
+        });
+      } else if (adminUser.role !== "admin") {
+        adminUser.role = "admin";
+        await adminUser.save();
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Admin login successful",
+        token: generateToken(adminUser._id),
+        user: {
+          _id: adminUser._id,
+          name: adminUser.name,
+          email: adminUser.email,
+          role: "admin",
+          phone: adminUser.phone,
+          address: adminUser.address,
+        },
+      });
+    }
+
+    // Otherwise check regular DB user with role admin
+    const user = await User.findOne({ email }).select("+password");
+
+    if (user && (await user.matchPassword(password))) {
+      if (user.role !== "admin") {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied: Account is not an administrator",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Admin login successful",
+        token: generateToken(user._id),
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          address: user.address,
+        },
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      message: "Invalid admin email or password",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
+  adminLoginUser,
   getUserProfile,
   updateUserProfile,
 };

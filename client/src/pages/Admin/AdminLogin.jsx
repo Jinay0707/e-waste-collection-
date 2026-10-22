@@ -32,11 +32,27 @@ const AdminLogin = () => {
     setLoading(true)
     try {
       const { data } = await api.post('/api/auth/admin/login', formData)
-      login(data.user)
+      login({ ...data.user, token: data.token })
       toast.success('Admin login successful!')
       navigate('/admin/dashboard')
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Admin login failed. Please try again.')
+      // Fallback for standalone / client-only mode
+      if (
+        (formData.email === 'admin@example.com' && formData.password === 'admin123') ||
+        (formData.email === 'admin@ewaste.com' && formData.password === 'admin123')
+      ) {
+        login({
+          _id: 'admin_local_1',
+          name: 'System Administrator',
+          email: formData.email,
+          role: 'admin',
+          token: 'mock_admin_token'
+        })
+        toast.success('Admin login successful!')
+        navigate('/admin/dashboard')
+      } else {
+        toast.error(error.response?.data?.message || 'Admin login failed. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -91,6 +107,21 @@ const AdminLogin = () => {
             )}
           </button>
         </form>
+
+        <div className="demo-credentials-box" style={{ borderColor: '#fecaca', background: '#fff5f5' }}>
+          <div>
+            <p style={{ fontWeight: 600, color: '#991b1b' }}>⚡ Quick Admin Demo</p>
+            <p style={{ color: '#b91c1c' }}>admin@example.com / admin123</p>
+          </div>
+          <button
+            type="button"
+            className="demo-fill-btn"
+            style={{ background: '#ef4444', color: '#fff', border: 'none' }}
+            onClick={() => setFormData({ email: 'admin@example.com', password: 'admin123' })}
+          >
+            Auto Fill
+          </button>
+        </div>
 
         <div className="auth-footer">
           <p style={{ fontSize: '0.85rem' }}>
