@@ -5,6 +5,7 @@ const {
   adminLoginUser,
   forgotPassword,
   resetPassword,
+  directResetPassword,
   getUserProfile,
   updateUserProfile,
 } = require("../controllers/authController");
@@ -17,6 +18,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/admin/login", adminLoginUser);
 router.post("/forgot-password", forgotPassword);
+router.post("/direct-reset-password", directResetPassword);
 router.put("/reset-password/:resetToken", resetPassword);
 
 // Protected routes

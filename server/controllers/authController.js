@@ -395,12 +395,54 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// @desc    Direct Reset Password without email verification
+// @route   POST /api/auth/direct-reset-password
+// @access  Public
+const directResetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide both email and new password",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No registered user found with this email",
+      });
+    }
+
+    // Set new password (pre-save middleware will hash it)
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully! You can now login.",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   adminLoginUser,
   forgotPassword,
   resetPassword,
+  directResetPassword,
   getUserProfile,
   updateUserProfile,
 };
