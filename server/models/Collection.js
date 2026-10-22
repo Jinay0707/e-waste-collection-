@@ -8,27 +8,67 @@ const collectionSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: true,
+      default: "",
     },
     phone: {
       type: String,
-      required: true,
+      default: "",
     },
     address: {
       type: String,
-      required: true,
+      default: "",
+    },
+    city: {
+      type: String,
+      default: "",
     },
     eWasteType: {
       type: String,
-      required: true,
+      default: "Other",
+    },
+    deviceType: {
+      type: String,
+      default: "",
+    },
+    brand: {
+      type: String,
+      default: "",
+    },
+    model: {
+      type: String,
+      default: "",
     },
     quantity: {
       type: String,
-      required: true,
+      default: "1",
+    },
+    weight: {
+      type: String,
+      default: "1",
+    },
+    condition: {
+      type: String,
+      default: "working",
+    },
+    pickupDate: {
+      type: String,
+      default: "",
+    },
+    pickupTime: {
+      type: String,
+      default: "",
+    },
+    specialInstructions: {
+      type: String,
+      default: "",
+    },
+    estimatedPoints: {
+      type: Number,
+      default: 25,
     },
     status: {
       type: String,
-      default: "Pending",
+      default: "Pending", // Pending, Scheduled, In-Progress, Completed, Cancelled
     },
   },
   {

@@ -18,10 +18,12 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/collections", collectionRoutes);
+app.use("/api/pickup", collectionRoutes);
+app.use("/api/admin", collectionRoutes);
 
 app.get("/", (req, res) => {
   res.json({
-    message: "E-Waste Collection Portal API is running"
+    message: "E-Waste Collection Portal API is running",
   });
 });
 
@@ -29,4 +31,4 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-});
+});

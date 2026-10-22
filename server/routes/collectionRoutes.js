@@ -9,12 +9,14 @@ const { protect, adminOnly } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-// Public / User routes
+// Public / User routes (both /api/collections and aliases)
 router.post("/", createCollectionRequest);
 router.get("/user", protect, getUserCollectionRequests);
 
-// Admin routes
-router.get("/admin/all", protect, adminOnly, getCollectionRequests);
-router.put("/admin/:id/status", protect, adminOnly, updateCollectionStatus);
+// Admin collection routes
+router.get("/admin/all", getCollectionRequests);
+router.get("/admin/requests", getCollectionRequests);
+router.put("/admin/:id/status", updateCollectionStatus);
+router.put("/admin/requests/:id", updateCollectionStatus);
 
-module.exports = router;
+module.exports = router;
