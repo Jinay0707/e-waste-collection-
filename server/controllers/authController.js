@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/User");
+const sendEmail = require("../utils/sendEmail");
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -260,10 +262,145 @@ const adminLoginUser = async (req, res) => {
   }
 };
 
+// @desc    Forgot Password - Send reset email
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No user found with that email address",
+      });
+    }
+
+    // Generate random reset token
+    const resetToken = crypto.randomBytes(20).toString("hex");
+
+    // Hash token and set to resetPasswordToken field
+    user.resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .toString("hex");
+
+    // Expire in 1 hour
+    user.resetPasswordExpire = Date.now() + 60 * 60 * 1000;
+
+    await user.save();
+
+    // Create reset URL (supports local and live client url)
+    const clientUrl = process.env.CLIENT_URL || "https://e-waste-collection-one.vercel.app";
+    const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
+
+    const message = `Hello ${user.name},\n\nYou requested a password reset for your E-Waste Collection Portal account.\n\nPlease click the link below to set a new password (valid for 1 hour):\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #10b981; margin: 0;">♻️ E-Waste Collection Portal</h2>
+          <p style="color: #64748b; font-size: 14px;">Password Reset Request</p>
+        </div>
+        <p style="font-size: 15px; color: #334155;">Hello <strong>${user.name}</strong>,</p>
+        <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+          You recently requested to reset your password. Click the button below to choose a new password:
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${resetUrl}" style="background: #10b981; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block;">
+            Reset Password
+          </a>
+        </div>
+        <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">
+          This link will expire in 1 hour.<br/>
+          If you didn't request a password reset, you can safely ignore this email.
+        </p>
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 20px 0;" />
+        <p style="font-size: 11px; color: #94a3b8; word-break: break-all;">
+          Or copy-paste this link in your browser: <br/>${resetUrl}
+        </p>
+      </div>
+    `;
+
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: "Password Reset Request - E-Waste Collection Portal",
+        message,
+        html,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Password reset link sent to your email inbox",
+      });
+    } catch (err) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+
+      return res.status(500).json({
+        success: false,
+        message: "Email could not be sent. Please check SMTP settings.",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Reset Password with token
+// @route   PUT /api/auth/reset-password/:resetToken
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    // Get hashed token
+    const resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(req.params.resetToken)
+      .toString("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    // Set new password
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully. You can now login.",
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   adminLoginUser,
+  forgotPassword,
+  resetPassword,
   getUserProfile,
   updateUserProfile,
 };

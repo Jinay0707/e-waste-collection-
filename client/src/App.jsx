@@ -11,6 +11,7 @@ import Contact from "./pages/User/Contact";
 import Login from "./pages/User/Login";
 import Register from "./pages/User/Register";
 import ForgotPassword from "./pages/User/ForgotPassword";
+import ResetPassword from "./pages/User/ResetPassword";
 import Dashboard from "./pages/User/Dashboard";
 import PickupRequest from "./pages/User/PickupRequest";
 import SchedulePickup from "./pages/User/SchedulePickup";
@@ -44,6 +45,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
               <Route path="/schedule-pickup" element={<SchedulePickup />} />
 
               {/* User Routes */}
